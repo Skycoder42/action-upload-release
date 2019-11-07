@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { Archive } from './archive';
 
 async function get_release_by_tag(tag: string, octokit: any, context: any): Promise<any> {
     try {
@@ -23,7 +24,7 @@ async function get_release_by_tag(tag: string, octokit: any, context: any): Prom
     }
 }
 
-async function upload_to_release(release: any, file: string, asset_name: string, tag: string, overwrite: string, octokit: any, context: any) {
+async function upload_to_release(release: any, file: string, content_type: string, asset_name: string, tag: string, overwrite: string, octokit: any, context: any) {
     const file_size = fs.statSync(file).size;
     const file_bytes = fs.readFileSync(file);
 
@@ -54,7 +55,7 @@ async function upload_to_release(release: any, file: string, asset_name: string,
         name: asset_name,
         file: file_bytes,
         headers: {
-            "content-type": "binary/octet-stream",
+            "content-type": content_type,
             "content-length": file_size
         },
     });
@@ -63,20 +64,23 @@ async function upload_to_release(release: any, file: string, asset_name: string,
 async function run() {
     try {
         const token = core.getInput('repo_token', { required: true });
-        const file = core.getInput('file', { required: true });
+        const directory = core.getInput('directory', { required: true });
         const asset_name = core.getInput('asset_name', { required: true });
         const tag = core.getInput('tag', { required: true }).replace("refs/tags/", "");
         const overwrite = core.getInput('overwrite');
 
-        if (!fs.existsSync(file)) {
-            core.setFailed(`File ${file} wasn't found.`);
+        if (!fs.existsSync(directory)) {
+            core.setFailed(`Directory ${directory} wasn't found.`);
         }
 
         const octokit = new github.GitHub(token);
         const context = github.context;
 
+        const archive = new Archive();
+        const aPath = await archive.prepareArchive(asset_name, directory);
+
         const release = await get_release_by_tag(tag, octokit, context);
-        await upload_to_release(release, file, asset_name, tag, overwrite, octokit, context);
+        await upload_to_release(release, aPath, archive.mimeType(), archive.fullName(asset_name), tag, overwrite, octokit, context);
     } catch (error) {
         core.setFailed(error.message);
     }
