@@ -722,12 +722,30 @@ exports.Archive = void 0;
 const os = __importStar(__webpack_require__(87));
 const path = __importStar(__webpack_require__(622));
 const ex = __importStar(__webpack_require__(986));
+const io = __importStar(__webpack_require__(1));
 class Archive {
     mimeType() {
         return os.platform() == 'win32' ? 'application/zip' : 'application/x-xz';
     }
     fullName(name) {
         return os.platform() == 'win32' ? name + '.zip' : name + '.tar.xz';
+    }
+    preparePlatformDirs(directory, platform) {
+        return __awaiter(this, void 0, void 0, function* () {
+            switch (platform) {
+                case "examples":
+                case "doc":
+                    return path.join(directory, platform);
+                default:
+                    yield io.rmRF(path.join(directory, "examples"));
+                    yield io.rmRF(path.join(directory, "doc"));
+                    yield io.rmRF(path.join(directory, "Tools"));
+                    const newDir = path.join(directory, "..", "qt-install");
+                    yield io.mkdirP(newDir);
+                    yield io.mv(directory, path.join(newDir, platform));
+                    return newDir;
+            }
+        });
     }
     prepareArchive(name, dirPath) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -2652,7 +2670,8 @@ function run() {
         try {
             // Get the inputs from the workflow file: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
             const token = core.getInput('repo_token', { required: true });
-            const directory = core.getInput('directory', { required: true });
+            let directory = core.getInput('directory', { required: true });
+            const platform = core.getInput('platform');
             const tag = core.getInput('tag', { required: true }).replace('refs/tags/', '');
             const file_glob = core.getInput('file_glob') == 'true' ? true : false;
             const overwrite = core.getInput('overwrite') == 'true' ? true : false;
@@ -2679,6 +2698,9 @@ function run() {
                     ? core.getInput('asset_name').replace(/\$tag/g, tag)
                     : path.basename(directory);
                 const archive = new archive_1.Archive();
+                if (platform !== "") {
+                    directory = yield archive.preparePlatformDirs(directory, platform);
+                }
                 const archivePath = yield archive.prepareArchive(asset_name, directory);
                 const asset_download_url = yield upload_to_release(release, archivePath, archive.mimeType(), archive.fullName(asset_name), tag, overwrite, octokit);
                 core.setOutput('browser_download_url', asset_download_url);

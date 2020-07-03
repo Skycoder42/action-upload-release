@@ -105,7 +105,8 @@ async function run(): Promise<void> {
   try {
     // Get the inputs from the workflow file: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
     const token = core.getInput('repo_token', {required: true})
-    const directory = core.getInput('directory', {required: true})
+    let directory = core.getInput('directory', {required: true})
+    const platform = core.getInput('platform')
     const tag = core.getInput('tag', {required: true}).replace('refs/tags/', '')
 
     const file_glob = core.getInput('file_glob') == 'true' ? true : false
@@ -149,6 +150,9 @@ async function run(): Promise<void> {
           : path.basename(directory)
 
       const archive = new Archive()
+      if (platform !== '') {
+        directory = await archive.preparePlatformDirs(directory, platform)
+      }
       const archivePath = await archive.prepareArchive(asset_name, directory)
 
       const asset_download_url = await upload_to_release(

@@ -11,6 +11,8 @@ inputs:
   directory:
     description: 'Local directory to upload.'
     required: true
+  platform:
+    description: 'The platform inside the target directory to be uploaded.'
   tag:
     description: 'Tag to use as a release.'
     required: true

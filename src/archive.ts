@@ -2,6 +2,7 @@ import * as os from 'os'
 import * as path from 'path'
 
 import * as ex from '@actions/exec'
+import * as io from '@actions/io'
 
 export class Archive {
   mimeType(): string {
@@ -10,6 +11,25 @@ export class Archive {
 
   fullName(name: string): string {
     return os.platform() == 'win32' ? name + '.zip' : name + '.tar.xz'
+  }
+
+  async preparePlatformDirs(
+    directory: string,
+    platform: string
+  ): Promise<string> {
+    switch (platform) {
+      case 'examples':
+      case 'doc':
+        return path.join(directory, platform)
+      default:
+        await io.rmRF(path.join(directory, 'examples'))
+        await io.rmRF(path.join(directory, 'doc'))
+        await io.rmRF(path.join(directory, 'Tools'))
+        const newDir = path.join(directory, '..', 'qt-install')
+        await io.mkdirP(newDir)
+        await io.mv(directory, path.join(newDir, platform))
+        return newDir
+    }
   }
 
   async prepareArchive(name: string, dirPath: string): Promise<string> {
