@@ -5,6 +5,7 @@ import * as core from '@actions/core'
 import * as github from '@actions/github'
 import * as path from 'path'
 import * as glob from 'glob'
+import {Archive} from './archive'
 
 type RepoAssetsResp = Endpoints['GET /repos/:owner/:repo/releases/:release_id/assets']['response']
 type ReleaseByTagResp = Endpoints['GET /repos/:owner/:repo/releases/tags/:tag']['response']
@@ -46,6 +47,7 @@ async function get_release_by_tag(
 async function upload_to_release(
   release: ReleaseByTagResp | CreateReleaseResp,
   file: string,
+  content_type: string,
   asset_name: string,
   tag: string,
   overwrite: boolean,
@@ -91,7 +93,7 @@ async function upload_to_release(
       name: asset_name,
       data: file_bytes,
       headers: {
-        'content-type': 'binary/octet-stream',
+        'content-type': content_type,
         'content-length': file_size
       }
     }
@@ -103,7 +105,7 @@ async function run(): Promise<void> {
   try {
     // Get the inputs from the workflow file: https://github.com/actions/toolkit/tree/master/packages/core#inputsoutputs
     const token = core.getInput('repo_token', {required: true})
-    const file = core.getInput('file', {required: true})
+    const directory = core.getInput('directory', {required: true})
     const tag = core.getInput('tag', {required: true}).replace('refs/tags/', '')
 
     const file_glob = core.getInput('file_glob') == 'true' ? true : false
@@ -122,13 +124,14 @@ async function run(): Promise<void> {
     )
 
     if (file_glob) {
-      const files = glob.sync(file)
+      const files = glob.sync(directory)
       if (files.length > 0) {
         for (const file of files) {
           const asset_name = path.basename(file)
           const asset_download_url = await upload_to_release(
             release,
             file,
+            'binary/octet-stream',
             asset_name,
             tag,
             overwrite,
@@ -143,11 +146,16 @@ async function run(): Promise<void> {
       const asset_name =
         core.getInput('asset_name') !== ''
           ? core.getInput('asset_name').replace(/\$tag/g, tag)
-          : path.basename(file)
+          : path.basename(directory)
+
+      const archive = new Archive()
+      const archivePath = await archive.prepareArchive(asset_name, directory)
+
       const asset_download_url = await upload_to_release(
         release,
-        file,
-        asset_name,
+        archivePath,
+        archive.mimeType(),
+        archive.fullName(asset_name),
         tag,
         overwrite,
         octokit

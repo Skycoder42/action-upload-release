@@ -8,8 +8,8 @@ inputs:
   repo_token:
     description: 'GitHub token.'
     required: true
-  file:
-    description: 'Local file to upload.'
+  directory:
+    description: 'Local directory to upload.'
     required: true
   tag:
     description: 'Tag to use as a release.'
